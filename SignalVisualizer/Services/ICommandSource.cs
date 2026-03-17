@@ -1,6 +1,8 @@
+using System;
+
 namespace SignalVisualizer.Services;
 
 public interface ICommandSource
 {
-    void SendCommand(string command);
+    void SendCommand(ReadOnlySpan<char> command);
 }

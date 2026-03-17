@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.IO;
 using System.IO.Ports;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -9,127 +11,186 @@ namespace SignalVisualizer.Services;
 
 /// <summary>
 /// Reads MAVLink v2 RAW_IMU messages from a serial port.
-/// Minimal parser — no external MAVLink library needed.
-///
-/// MAVLink v2 frame:
-/// [FD] [len] [incompat] [compat] [seq] [sysid] [compid] [msgid0] [msgid1] [msgid2] [payload...] [crc_lo] [crc_hi]
-///
-/// RAW_IMU (msg id 27) payload (29 bytes):
-///   time_usec  (8 bytes, uint64)
-///   xacc       (2 bytes, int16)  ← we read this (our ADC value)
-///   yacc       (2 bytes, int16)
-///   zacc       (2 bytes, int16)
-///   xgyro      (2 bytes, int16)
-///   ygyro      (2 bytes, int16)
-///   zgyro      (2 bytes, int16)
-///   xmag       (2 bytes, int16)
-///   ymag       (2 bytes, int16)
-///   zmag       (2 bytes, int16)
-///   id         (1 byte,  uint8)
-///   temperature(2 bytes, int16)
+/// Auto-detects STM32 ST-Link virtual COM port and reconnects on unplug/replug.
+/// Zero-alloc hot path: uses ArrayPool + stackalloc, no per-frame heap allocations.
 /// </summary>
 public class MavlinkSignalSource : ISignalSource, ICommandSource, IDisposable
 {
-    private const byte MavlinkStx = 0xFD;       // MAVLink v2 start byte
+    private const byte MavlinkStx = 0xFD;
     private const int RawImuMsgId = 27;
-    private const int RawImuPayloadLen = 29;     // MAVLink v2 RAW_IMU payload size
+    private const int HeaderLen = 9;
+    private const int CrcLen = 2;
+    private const int MaxPayload = 255;
 
-    private readonly SerialPort _port;
+    private readonly string _portPattern;
+    private readonly int _baudRate;
     private readonly Subject<double> _subject = new();
+    private readonly BehaviorSubject<bool> _connected = new(false);
+    private SerialPort? _port;
     private CancellationTokenSource? _cts;
 
     public IObservable<double> SignalStream => _subject.AsObservable();
+    public IObservable<bool> ConnectionState => _connected.AsObservable();
+    public bool IsConnected => _connected.Value;
 
-    public MavlinkSignalSource(string portName, int baudRate = 115200)
+    /// <param name="portPattern">Glob pattern to match port, e.g. "usbmodem" matches /dev/tty.usbmodem*</param>
+    /// <param name="baudRate">Serial baud rate</param>
+    public MavlinkSignalSource(string portPattern = "usbmodem", int baudRate = 115200)
     {
-        _port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
-        {
-            ReadTimeout = 1000,
-        };
+        _portPattern = portPattern;
+        _baudRate = baudRate;
     }
 
     public void Start()
     {
-        _port.Open();
         _cts = new CancellationTokenSource();
-        Task.Run(() => ReadLoop(_cts.Token));
+        Task.Run(() => ConnectionLoop(_cts.Token));
     }
 
     public void Stop()
     {
         _cts?.Cancel();
-        if (_port.IsOpen)
-            _port.Close();
+        ClosePort();
     }
 
-    private void ReadLoop(CancellationToken ct)
+    private void ConnectionLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                // 1. Sync — find MAVLink v2 header
+                if (_port == null || !_port.IsOpen)
+                {
+                    _connected.OnNext(false);
+                    var portName = FindPort();
+
+                    if (portName == null)
+                    {
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+
+                    _port = new SerialPort(portName, _baudRate, Parity.None, 8, StopBits.One)
+                    {
+                        ReadTimeout = 1000,
+                    };
+                    _port.Open();
+                    _connected.OnNext(true);
+                    Console.WriteLine($"[MavLink] Connected: {portName}");
+                }
+
+                ReadLoop(ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                Console.WriteLine($"[MavLink] Disconnected: {ex.Message}");
+                ClosePort();
+                _connected.OnNext(false);
+                Thread.Sleep(1000);
+            }
+        }
+    }
+
+    private void ReadLoop(CancellationToken ct)
+    {
+        // Single rented buffer for the entire read session — zero per-frame allocations
+        byte[] buf = ArrayPool<byte>.Shared.Rent(HeaderLen + MaxPayload + CrcLen);
+        try
+        {
+            ReadLoopCore(ct, buf);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+        }
+    }
+
+    private void ReadLoopCore(CancellationToken ct, byte[] buf)
+    {
+        // Layout inside buf:
+        //   [0..8]   = header  (9 bytes)
+        //   [9..9+payloadLen-1] = payload
+        //   [9+payloadLen..9+payloadLen+1] = crc
+        while (!ct.IsCancellationRequested && _port is { IsOpen: true })
+        {
+            try
+            {
                 int b = _port.ReadByte();
                 if (b != MavlinkStx)
                     continue;
 
-                // 2. Read header (9 bytes after STX)
-                var header = new byte[9];
-                ReadExact(header, 0, 9);
+                ReadExact(buf, 0, HeaderLen);
 
-                byte payloadLen = header[0];    // len
-                // header[1] = incompat_flags
-                // header[2] = compat_flags
-                // header[3] = seq
-                // header[4] = sysid
-                // header[5] = compid
-                int msgId = header[6] | (header[7] << 8) | (header[8] << 16);
+                byte payloadLen = buf[0];
+                int msgId = buf[6] | (buf[7] << 8) | (buf[8] << 16);
 
-                // 3. Read payload + 2 bytes CRC
-                var payload = new byte[payloadLen];
-                ReadExact(payload, 0, payloadLen);
+                ReadExact(buf, HeaderLen, payloadLen);
+                ReadExact(buf, HeaderLen + payloadLen, CrcLen);
 
-                var crc = new byte[2];
-                ReadExact(crc, 0, 2);
-
-                // 4. If RAW_IMU, extract xacc (bytes 8-9 of payload, little-endian int16)
                 if (msgId == RawImuMsgId && payloadLen >= 10)
                 {
-                    short xacc = (short)(payload[8] | (payload[9] << 8));
+                    int payloadStart = HeaderLen;
+                    short xacc = (short)(buf[payloadStart + 8] | (buf[payloadStart + 9] << 8));
                     _subject.OnNext(xacc);
                 }
             }
             catch (TimeoutException)
             {
-                // No data, keep waiting
+                // No data — keep waiting
             }
-            catch (Exception) when (ct.IsCancellationRequested)
+            catch (IOException)
+            {
+                break;
+            }
+            catch (UnauthorizedAccessException)
             {
                 break;
             }
         }
     }
 
+    private string? FindPort()
+    {
+        foreach (var name in SerialPort.GetPortNames())
+        {
+            if (name.Contains(_portPattern, StringComparison.OrdinalIgnoreCase))
+                return name;
+        }
+        return null;
+    }
+
     private void ReadExact(byte[] buffer, int offset, int count)
     {
         while (count > 0)
         {
-            int read = _port.Read(buffer, offset, count);
+            int read = _port!.Read(buffer, offset, count);
             offset += read;
             count -= read;
         }
     }
 
-    public void SendCommand(string command)
+    private void ClosePort()
     {
-        if (_port.IsOpen)
-            _port.Write(command + "\r\n");
+        try
+        {
+            if (_port is { IsOpen: true })
+                _port.Close();
+        }
+        catch { /* already gone */ }
+        _port?.Dispose();
+        _port = null;
+    }
+
+    public void SendCommand(ReadOnlySpan<char> command)
+    {
+        if (_port is { IsOpen: true })
+            _port.Write(string.Concat(command, "\r\n"));
     }
 
     public void Dispose()
     {
         Stop();
         _subject.Dispose();
-        _port.Dispose();
+        _connected.Dispose();
     }
 }

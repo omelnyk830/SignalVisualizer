@@ -49,14 +49,18 @@ public partial class App : Application
         var services = new ServiceCollection();
 
         // Signal source — swap this line to change the input
-        services.AddSingleton(_ => new MavlinkSignalSource("/dev/tty.usbmodem1103"));
+        services.AddSingleton(_ => new MavlinkSignalSource("usbmodem"));
         services.AddSingleton<ISignalSource>(sp => sp.GetRequiredService<MavlinkSignalSource>());
         services.AddSingleton<ICommandSource>(sp => sp.GetRequiredService<MavlinkSignalSource>());
         // For sources without commands, just register ISignalSource:
         // services.AddSingleton<ISignalSource>(_ => new MockSignalSource(frequencyHz: 1.0, samplesPerSecond: 100));
 
         services.AddSingleton<ISignalProcessor, SignalProcessor>();
-        services.AddTransient<MainWindowViewModel>();
+        services.AddSingleton<MainWindowViewModel>();
+
+        // Scoped — each packet log window gets its own instance
+        // Disposed when the window (and its scope) closes
+        services.AddScoped<PacketLogViewModel>();
 
         return services.BuildServiceProvider();
     }

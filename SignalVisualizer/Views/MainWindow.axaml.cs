@@ -24,10 +24,6 @@ public partial class MainWindow : Window
             {
                 SignalPlot.Plot.Axes.AutoScale();
                 SignalPlot.Refresh();
-
-                // Auto-scroll packet log to bottom
-                if (PacketLogList.ItemCount > 0 && PacketLogList.IsLoaded)
-                    try { PacketLogList.ScrollIntoView(PacketLogList.ItemCount - 1); } catch { }
             };
         }
     }
