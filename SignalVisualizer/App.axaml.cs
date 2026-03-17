@@ -48,19 +48,19 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
-        // Signal source — swap this line to change the input
-        services.AddSingleton(_ => new MavlinkSignalSource("usbmodem"));
-        services.AddSingleton<ISignalSource>(sp => sp.GetRequiredService<MavlinkSignalSource>());
-        services.AddSingleton<ICommandSource>(sp => sp.GetRequiredService<MavlinkSignalSource>());
-        // For sources without commands, just register ISignalSource:
-        // services.AddSingleton<ISignalSource>(_ => new MockSignalSource(frequencyHz: 1.0, samplesPerSecond: 100));
+        // Factory — swap to SerialSourceFactory for raw binary protocol
+        services.AddSingleton<ISignalSourceFactory, MavlinkSourceFactory>();
 
-        services.AddSingleton<ISignalProcessor, SignalProcessor>();
+        // UDP discovery — drones announce on port 14550
+        services.AddSingleton<UdpDroneDiscovery>();
+
+        // DroneManager: serial scan + UDP discovery
+        services.AddSingleton(sp => new DroneManager(
+            sp.GetRequiredService<ISignalSourceFactory>(),
+            sp.GetRequiredService<UdpDroneDiscovery>(),
+            portPattern: "usbmodem"));
+
         services.AddSingleton<MainWindowViewModel>();
-
-        // Scoped — each packet log window gets its own instance
-        // Disposed when the window (and its scope) closes
-        services.AddScoped<PacketLogViewModel>();
 
         return services.BuildServiceProvider();
     }

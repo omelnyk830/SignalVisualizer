@@ -14,7 +14,7 @@
         <!-- Toolbar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4" Spacing="12">
             <Button Command="{Binding TogglePauseCommand}"
-                    Content="{Binding IsPaused, Converter={x:Static vm:MainWindowViewModel.PauseConverter}}"
+                    Content="{Binding IsPaused, Converter={x:Static vm:ViewModelBase.PauseConverter}}"
                     Width="80" HorizontalContentAlignment="Center" />
             <Button Command="{Binding ClearLogCommand}" Content="Clear" />
             <TextBlock VerticalAlignment="Center"

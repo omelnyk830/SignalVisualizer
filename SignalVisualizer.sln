@@ -1,6 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SignalVisualizer", "SignalVisualizer\SignalVisualizer.csproj", "{7D2060A7-E7AF-4DFF-B3DC-D5B92BC6B407}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DroneMock", "DroneMock\DroneMock.csproj", "{7A9BFF56-2746-4AEA-87A6-434A5358EE8B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -12,5 +15,9 @@ Global
 		{7D2060A7-E7AF-4DFF-B3DC-D5B92BC6B407}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D2060A7-E7AF-4DFF-B3DC-D5B92BC6B407}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D2060A7-E7AF-4DFF-B3DC-D5B92BC6B407}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A9BFF56-2746-4AEA-87A6-434A5358EE8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A9BFF56-2746-4AEA-87A6-434A5358EE8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A9BFF56-2746-4AEA-87A6-434A5358EE8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A9BFF56-2746-4AEA-87A6-434A5358EE8B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

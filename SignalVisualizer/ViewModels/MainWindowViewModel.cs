@@ -1,136 +1,73 @@
-﻿using System;
-using Avalonia.Data.Converters;
-using Avalonia.Media;
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.DependencyInjection;
+using SignalVisualizer.Models;
 using SignalVisualizer.Services;
-using SignalVisualizer.Views;
 
 namespace SignalVisualizer.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    public static FuncValueConverter<bool, string> PauseConverter { get; } =
-        new(paused => paused ? "Resume" : "Pause");
+    private readonly DroneManager _droneManager;
+    private IDisposable? _eventSub;
 
-    public static FuncValueConverter<bool, Color> ConnectionColorConverter { get; } =
-        new(connected => connected ? Color.Parse("#2E7D32") : Color.Parse("#888888"));
-
-    private readonly ISignalProcessor _processor;
-    private readonly ICommandSource? _commandSource;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private IDisposable? _subscription;
-    private IDisposable? _connectionSub;
-
-    public double[] DataBuffer { get; } = new double[1000];
-    private int _writeIndex;
-
-    public event Action? DataUpdated;
+    public ObservableCollection<DroneTabViewModel> Drones { get; } = new();
 
     [ObservableProperty]
-    private bool _isPaused;
+    private DroneTabViewModel? _selectedDrone;
 
     [ObservableProperty]
-    private int _packetCount;
+    private int _droneCount;
 
-    [ObservableProperty]
-    private double _lastValue;
-
-    [ObservableProperty]
-    private bool _isConnected;
-
-    [ObservableProperty]
-    private string _connectionStatus = "No device";
-
-    [RelayCommand]
-    private void TogglePause() => IsPaused = !IsPaused;
-
-    [RelayCommand]
-    private void SendSos() => _commandSource?.SendCommand("MODE_SOS");
-
-    [RelayCommand]
-    private void SendStandby() => _commandSource?.SendCommand("MODE_STB");
-
-    [RelayCommand]
-    private void SendStatus() => _commandSource?.SendCommand("STATUS");
-
-    public bool HasCommandSource => _commandSource != null;
-
-    [RelayCommand]
-    private void OpenPacketLog()
+    public MainWindowViewModel(DroneManager droneManager)
     {
-        // Each window gets its own scope — disposed when window closes
-        var scope = _scopeFactory.CreateScope();
-        var vm = scope.ServiceProvider.GetRequiredService<PacketLogViewModel>();
+        _droneManager = droneManager;
 
-        var window = new PacketLogWindow
-        {
-            DataContext = vm,
-        };
-
-        // Dispose scope (and its services) when window closes
-        window.Closed += (_, _) => scope.Dispose();
-        window.Show();
-    }
-
-    public MainWindowViewModel(
-        ISignalProcessor processor,
-        IServiceScopeFactory scopeFactory,
-        ICommandSource? commandSource = null,
-        MavlinkSignalSource? mavlink = null)
-    {
-        _processor = processor;
-        _scopeFactory = scopeFactory;
-        _commandSource = commandSource;
-
-        if (mavlink != null)
-        {
-            _connectionSub = mavlink.ConnectionState
-                .Subscribe(connected =>
-                {
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        IsConnected = connected;
-                        ConnectionStatus = connected ? "Connected" : "Waiting for device…";
-                    });
-                });
-        }
-
-        _subscription = _processor.ProcessedStream
-            .Subscribe(batch =>
+        _eventSub = _droneManager.Events
+            .Subscribe(ev =>
             {
-                // Marshal everything to UI thread — single writer, no locks needed
                 Dispatcher.UIThread.Post(() =>
                 {
-                    if (IsPaused) return;
-
-                    foreach (var sample in batch)
+                    switch (ev.Type)
                     {
-                        DataBuffer[_writeIndex % DataBuffer.Length] = sample;
-                        _writeIndex++;
-                        PacketCount++;
-                        LastValue = sample;
-                    }
+                        case DroneEventType.Connected:
+                            var tab = new DroneTabViewModel(ev.Session);
+                            Drones.Add(tab);
+                            SelectedDrone ??= tab;
+                            DroneCount = Drones.Count;
+                            break;
 
-                    DataUpdated?.Invoke();
+                        case DroneEventType.Disconnected:
+                            var existing = Drones.FirstOrDefault(d => d.DroneId == ev.Session.DroneId);
+                            if (existing != null)
+                            {
+                                Drones.Remove(existing);
+                                existing.Dispose();
+                                if (SelectedDrone == existing)
+                                    SelectedDrone = Drones.FirstOrDefault();
+                                DroneCount = Drones.Count;
+                            }
+                            break;
+                    }
                 });
             });
 
-        _processor.Start();
+        _droneManager.Start();
     }
 
+    // Design-time constructor
     public MainWindowViewModel()
     {
-        _processor = null!;
-        _scopeFactory = null!;
+        _droneManager = null!;
     }
 
     public void Dispose()
     {
-        _processor?.Stop();
-        _subscription?.Dispose();
-        _connectionSub?.Dispose();
+        _droneManager?.Stop();
+        _eventSub?.Dispose();
+        foreach (var drone in Drones)
+            drone.Dispose();
     }
 }

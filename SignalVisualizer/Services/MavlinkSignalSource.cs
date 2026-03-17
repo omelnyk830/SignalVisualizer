@@ -14,7 +14,7 @@ namespace SignalVisualizer.Services;
 /// Auto-detects STM32 ST-Link virtual COM port and reconnects on unplug/replug.
 /// Zero-alloc hot path: uses ArrayPool + stackalloc, no per-frame heap allocations.
 /// </summary>
-public class MavlinkSignalSource : ISignalSource, ICommandSource, IDisposable
+public class MavlinkSignalSource : ISignalSource, ICommandSource, IConnectionAware, IDisposable
 {
     private const byte MavlinkStx = 0xFD;
     private const int RawImuMsgId = 27;

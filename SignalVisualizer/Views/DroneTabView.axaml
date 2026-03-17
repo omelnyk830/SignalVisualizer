@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             xmlns:vm="using:SignalVisualizer.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="500"
+             x:Class="SignalVisualizer.Views.DroneTabView"
+             x:DataType="vm:DroneTabViewModel">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- Plot -->
+        <ScottPlot:AvaPlot x:Name="SignalPlot" Grid.Row="0" MinHeight="200" />
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8,4" Spacing="12">
+            <!-- Connection status -->
+            <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                <Border.Background>
+                    <SolidColorBrush Color="{Binding IsConnected, Converter={x:Static vm:ViewModelBase.ConnectionColorConverter}}" />
+                </Border.Background>
+                <TextBlock Text="{Binding ConnectionStatus}" Foreground="White" FontSize="11" />
+            </Border>
+
+            <Button Command="{Binding TogglePauseCommand}"
+                    Content="{Binding IsPaused, Converter={x:Static vm:ViewModelBase.PauseConverter}}"
+                    Width="80" HorizontalContentAlignment="Center" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding PacketCount, StringFormat='Packets: {0}'}" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding LastValue, StringFormat='Last: {0:F0}'}" />
+
+            <!-- Separator -->
+            <Border Width="1" Background="Gray" Margin="4,2"
+                    IsVisible="{Binding HasCommandSource}" />
+
+            <!-- UAV commands -->
+            <Button Command="{Binding SendSosCommand}" Content="SOS"
+                    IsVisible="{Binding HasCommandSource}"
+                    Background="#CC3333" Foreground="White" />
+            <Button Command="{Binding SendStandbyCommand}" Content="Standby"
+                    IsVisible="{Binding HasCommandSource}" />
+            <Button Command="{Binding SendStatusCommand}" Content="Status"
+                    IsVisible="{Binding HasCommandSource}" />
+        </StackPanel>
+
+    </Grid>
+</UserControl>
