@@ -1,0 +1,37 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.rsuser
+*.DotSettings.user
+_ReSharper*/
+
+## Avalonia
+*.xr.cs
+
+## OS files
+.DS_Store
+Thumbs.db

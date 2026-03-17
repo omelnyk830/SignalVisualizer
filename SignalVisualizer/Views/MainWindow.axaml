@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="using:SignalVisualizer.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+        x:Class="SignalVisualizer.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="SignalVisualizer">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto,200">
+
+        <!-- Plot -->
+        <ScottPlot:AvaPlot x:Name="SignalPlot" Grid.Row="0" MinHeight="200" />
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8,4" Spacing="12">
+            <Button Command="{Binding TogglePauseCommand}"
+                    Content="{Binding IsPaused, Converter={x:Static vm:MainWindowViewModel.PauseConverter}}"
+                    Width="80" HorizontalContentAlignment="Center" />
+            <Button Command="{Binding ClearLogCommand}" Content="Clear" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding PacketCount, StringFormat='Packets: {0}'}" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding LastValue, StringFormat='Last: {0:F0}'}" />
+        </StackPanel>
+
+        <!-- Packet log -->
+        <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="0,1,0,0">
+            <ListBox ItemsSource="{Binding PacketLog}"
+                     x:Name="PacketLogList"
+                     FontFamily="Cascadia Mono,Consolas,Courier New"
+                     FontSize="12"
+                     Background="#1E1E1E"
+                     Foreground="#00FF88" />
+        </Border>
+
+    </Grid>
+</Window>
