@@ -29,6 +29,19 @@
                        Text="{Binding PacketCount, StringFormat='Packets: {0}'}" />
             <TextBlock VerticalAlignment="Center"
                        Text="{Binding LastValue, StringFormat='Last: {0:F0}'}" />
+
+            <!-- Separator -->
+            <Border Width="1" Background="Gray" Margin="4,2"
+                    IsVisible="{Binding HasCommandSource}" />
+
+            <!-- STM32 commands -->
+            <Button Command="{Binding SendSosCommand}" Content="SOS"
+                    IsVisible="{Binding HasCommandSource}"
+                    Background="#CC3333" Foreground="White" />
+            <Button Command="{Binding SendStandbyCommand}" Content="Standby"
+                    IsVisible="{Binding HasCommandSource}" />
+            <Button Command="{Binding SendStatusCommand}" Content="Status"
+                    IsVisible="{Binding HasCommandSource}" />
         </StackPanel>
 
         <!-- Packet log -->

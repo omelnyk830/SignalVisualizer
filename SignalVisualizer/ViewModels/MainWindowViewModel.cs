@@ -15,6 +15,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         new(paused => paused ? "Resume" : "Pause");
 
     private readonly ISignalProcessor _processor;
+    private readonly ICommandSource? _commandSource;
     private IDisposable? _subscription;
 
     public double[] DataBuffer { get; } = new double[1000];
@@ -48,9 +49,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         PacketCount = 0;
     }
 
-    public MainWindowViewModel(ISignalProcessor processor)
+    [RelayCommand]
+    private void SendSos() => _commandSource?.SendCommand("MODE_SOS");
+
+    [RelayCommand]
+    private void SendStandby() => _commandSource?.SendCommand("MODE_STB");
+
+    [RelayCommand]
+    private void SendStatus() => _commandSource?.SendCommand("STATUS");
+
+    public bool HasCommandSource => _commandSource != null;
+
+    public MainWindowViewModel(ISignalProcessor processor, ICommandSource? commandSource = null)
     {
         _processor = processor;
+        _commandSource = commandSource;
 
         _subscription = _processor.ProcessedStream
             .Subscribe(batch =>

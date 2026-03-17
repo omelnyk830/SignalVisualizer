@@ -28,7 +28,7 @@ namespace SignalVisualizer.Services;
 ///   id         (1 byte,  uint8)
 ///   temperature(2 bytes, int16)
 /// </summary>
-public class MavlinkSignalSource : ISignalSource, IDisposable
+public class MavlinkSignalSource : ISignalSource, ICommandSource, IDisposable
 {
     private const byte MavlinkStx = 0xFD;       // MAVLink v2 start byte
     private const int RawImuMsgId = 27;
@@ -118,6 +118,12 @@ public class MavlinkSignalSource : ISignalSource, IDisposable
             offset += read;
             count -= read;
         }
+    }
+
+    public void SendCommand(string command)
+    {
+        if (_port.IsOpen)
+            _port.Write(command + "\r\n");
     }
 
     public void Dispose()

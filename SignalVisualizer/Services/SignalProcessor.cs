@@ -4,7 +4,7 @@ using System.Reactive.Linq;
 
 namespace SignalVisualizer.Services;
 
-public class SignalProcessor: ISignalProcessor
+public class SignalProcessor: ISignalProcessor, IDisposable
 {
     private readonly ISignalSource _source;
     public IObservable<IList<double>> ProcessedStream { get; }
@@ -22,5 +22,11 @@ public class SignalProcessor: ISignalProcessor
     public void Stop()
     {
         _source.Stop();
+    }
+
+    public void Dispose()
+    {
+        Stop();
+        (_source as IDisposable)?.Dispose();
     }
 }

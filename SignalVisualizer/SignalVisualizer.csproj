@@ -24,6 +24,7 @@
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
         <PackageReference Include="ScottPlot.Avalonia" Version="5.1.57" />
         <PackageReference Include="System.IO.Ports" Version="10.0.5" />
         <PackageReference Include="System.Reactive" Version="6.1.0" />
